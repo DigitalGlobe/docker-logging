@@ -41,7 +41,7 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
    Elasticsearch Cluster where we grant access to AWS account XXXXXXXXXXXX and
    the IP addresses 192.168.1.1, 192.168.1.2:
 
-```
+   ```
 {
     "Version": "2012-10-17",
     "Statement": [
@@ -122,15 +122,17 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
           ]
             ]
         }
-		}```
+     }
+     ```
 
-   2. Add ElasticsearchAddress to your `Parameters` section:
+  2. Add ElasticsearchAddress to your `Parameters` section:
 
-   ```
+     ```
    "ElasticsearchAddress": {
 	    "Type": "String",
 	    "Description": "Host and port of Elasticsearch server for logging. With the AWS Elasticsearch Service use Endpoint:80. Ensure the access policy permits access."
-	}```
+   }
+   ```
 
 5. Submit an ECS task definition which uses the gelf logging
    driver. The ContainerDefinition should include a section like
