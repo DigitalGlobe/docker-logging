@@ -2,7 +2,7 @@
 
 Pipe `docker logs` output into Elasticsearch for later visualization with Kibana using Logstash (aka the ELK Stack).
 
-# Setup
+# Local Setup
 
 Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version >= 1.5
 
@@ -13,6 +13,7 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
   1. Click "Create a new domain"
   2. Set a domain name
   3. Use the default options
+  4. Set an Access Policy from a specific IP address (your personal IP).
 
 2. Clone this repo & update the elasticsearch hostname. Note the
    format is `hostname:port`.  For example, with AWS Elasticsearch Service, use
@@ -29,8 +30,6 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
         docker run --log-driver=gelf --log-opt gelf-address=udp://localhost:12201 busybox /bin/sh -c 'while true; do echo "Hello $(date)"; sleep 1; done'
 
 # Deploying to an ECS Cluster
-
-Store your configuration in an S3 bucket
 
 1. Create an Elasticsearch Cluster with
    [AWS Elasticsearch Service](https://aws.amazon.com/elasticsearch-service/)
@@ -76,10 +75,82 @@ Store your configuration in an S3 bucket
 
         aws s3 cp conf/gelf_to_elasticsearch.conf s3://pschmitt-ecs-config/
 
-4. Configure ECS cluster via cfn-init to update the Logstash conf with the Elasticsearch URL & the Logstash container.
+4. Configure ECS cluster.  Here's how you do it with CloudFormation:
 
-        perl -pi -e "s|(?<=hosts => \[\")(.*)(?=\"\])|foobar:80|g" /conf/gelf_to_elasticsearch.conf
+  1. The
+     [AWS ECS-optimized AMI](https://aws.amazon.com/marketplace/pp/B00U6QTYI2)
+     (2015.09.b) is running docker-1.7.1 as of this
+     writing. [A post in the AWS forums](https://forums.aws.amazon.com/thread.jspa?messageID=683482)
+     states "[AWS is] testing 1.9 RC and plan to deliver it this
+     month."  It's not ready yet, so we must manually upgrade Docker.
 
+     We also fetch the Logstash configuration & pass in the
+     Elasticsearch URL and start the Logstash container.  Add this to
+     the `commands` section of your
+     [AWS::Cloudformation::Init](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.html).
+
+     ```
+      "03_upgrade_docker_for_log_driver_support": {
+        "command": {
+            "Fn::Join": [
+          "",
+          [
+              "#!/bin/bash -xe\n",
+              "service docker stop\n",
+              "cp /usr/bin/docker /usr/bin/docker.old\n",
+              "curl -o /usr/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.8.3\n",
+              "service docker start\n"
+          ]
+            ]
+        }
+      },
+      "04_configure_docker_logstash": {
+        "command": {
+            "Fn::Join": [
+          "",
+          [
+              "#!/bin/bash -xe\n",
+              "echo ECS_AVAILABLE_LOGGING_DRIVERS=[\"json-file\",\"syslog\",\"gelf\"] >> /etc/ecs/ecs.config",
+              "mkdir -p /etc/logstash/conf.d\n",
+              "aws s3 cp s3://pschmitt-ecs-config/gelf_to_elasticsearch.conf /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
+              "perl -pi -e 's|(?<=hosts => \\[\")(.*)(?=\"\\])|",
+              {
+            "Ref": "ElasticsearchAddress"
+              },
+              "|g' /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
+              "docker run -d --restart=always -v /etc/logstash/conf.d:/etc/logstash/conf.d -p 12201:12201/udp logstash logstash -f /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n"
+          ]
+            ]
+        }
+		}```
+
+   2. Add ElasticsearchAddress to your `Parameters` section:
+
+   ```
+   "ElasticsearchAddress": {
+	    "Type": "String",
+	    "Description": "Host and port of Elasticsearch server for logging. With the AWS Elasticsearch Service use Endpoint:80. Ensure the access policy permits access."
+	}```
+
+5. Submit an ECS task definition which uses the gelf logging
+   driver. The ContainerDefinition should include a section like
+   this:
+
+        "logConfiguration": {
+           "logDriver": "gelf",
+           "options": {
+             "gelf-address": "udp://localhost:12201",
+             "tag": "nginx"
+            }
+        }
+
+   As of this writing, the CloudFormation
+   [AWS::ECS::TaskDefintiion](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-containerdefinitions.html)
+   does not support the
+   [logConfiguration](http://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_LogConfiguration.html)
+   settings of an ECS TaskDefinition.  Watch the
+   [Cloudformation Release History](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/ReleaseHistory.html)
+   to be notified when this will be supported.
 
 
 # Notes
