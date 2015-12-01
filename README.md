@@ -146,6 +146,10 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
             }
         }
 
+   Note the log option `tag` requires Docker > 1.9.  For Docker 1.8, use `gelf-tag`.  Otherwise, ECS may report
+
+   > Failed to initialize logging driver: unknown log opt 'tag' for gelf log driver".
+
    As of this writing, the CloudFormation
    [AWS::ECS::TaskDefintiion](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-containerdefinitions.html)
    does not support the
