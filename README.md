@@ -90,47 +90,46 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
      [AWS::Cloudformation::Init](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.html).
 
      ```
-      "03_upgrade_docker_for_log_driver_support": {
-        "command": {
-            "Fn::Join": [
-          "",
-          [
-              "#!/bin/bash -xe\n",
-              "service docker stop\n",
-              "cp /usr/bin/docker /usr/bin/docker.old\n",
-              "curl -o /usr/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.8.3\n",
-              "service docker start\n"
-          ]
-            ]
-        }
-      },
-      "04_configure_docker_logstash": {
-        "command": {
-            "Fn::Join": [
-          "",
-          [
-              "#!/bin/bash -xe\n",
-              "echo ECS_AVAILABLE_LOGGING_DRIVERS=[\"json-file\",\"syslog\",\"gelf\"] >> /etc/ecs/ecs.config",
-              "mkdir -p /etc/logstash/conf.d\n",
-              "aws s3 cp s3://pschmitt-ecs-config/gelf_to_elasticsearch.conf /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
-              "perl -pi -e 's|(?<=hosts => \\[\")(.*)(?=\"\\])|",
-              {
-            "Ref": "ElasticsearchAddress"
-              },
-              "|g' /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
-              "docker run -d --restart=always -v /etc/logstash/conf.d:/etc/logstash/conf.d -p 12201:12201/udp logstash logstash -f /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n"
-          ]
-            ]
-        }
-     }
+     "03_upgrade_docker_for_log_driver_support": {
+       "command": {
+         "Fn::Join": [
+             "",
+             [
+                 "#!/bin/bash -xe\n",
+                 "service docker stop\n",
+                 "cp /usr/bin/docker /usr/bin/docker.old\n",
+                 "curl -o /usr/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.9.0\n",
+                 "service docker start\n"
+             ]
+           ]
+         }
+       },
+       "04_configure_docker_logstash": {
+         "command": {
+           "Fn::Join": [
+             "",
+             [
+                 "#!/bin/bash -xe\n",
+                 "mkdir -p /etc/logstash/conf.d\n",
+                 "aws s3 cp s3://pschmitt-ecs-config/gelf_to_elasticsearch.conf /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
+                 "perl -pi -e 's|(?<=hosts => \\[\")(.*)(?=\"\\])|",
+                 {
+                   "Ref": "ElasticsearchAddress"
+                 },
+                 "|g' /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
+                 "docker run -d --restart=always -v /etc/logstash/conf.d:/etc/logstash/conf.d -p 12201:12201/udp logstash logstash -f /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n"
+             ]
+           ]
+         }
+       }
      ```
 
   2. Add ElasticsearchAddress to your `Parameters` section:
 
      ```
    "ElasticsearchAddress": {
-	    "Type": "String",
-	    "Description": "Host and port of Elasticsearch server for logging. With the AWS Elasticsearch Service use Endpoint:80. Ensure the access policy permits access."
+     "Type": "String",
+     "Description": "Host and port of Elasticsearch server for logging. With the AWS Elasticsearch Service use Endpoint:80. Ensure the access policy permits access."
    }
    ```
 
