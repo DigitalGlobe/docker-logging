@@ -3,7 +3,7 @@ set -e
 
 # Setup logstash config based on environment variables set via
 # Docker. Note that logstash config files cannot parse environment
-# variables.
+# variables https://github.com/elastic/logstash/issues/1910#issuecomment-59634201
 
 # Note the Perl Regex tricks: 
 # (?<=foo) positive lookbehind
