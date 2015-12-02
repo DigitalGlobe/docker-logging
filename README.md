@@ -2,6 +2,8 @@
 
 Pipe `docker logs` output into Elasticsearch for later visualization with Kibana using Logstash (aka the ELK Stack).
 
+![Schematic of how Docker Logs get scraped into Elasticsearch using docker-logging logstash container.  Source: Docker-Logging.png; Find original visio file at Docker-Logging.vsdx](Docker-Logging.png)
+
 # Local Setup
 
 Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version >= 1.5
