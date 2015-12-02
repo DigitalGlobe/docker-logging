@@ -15,21 +15,59 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
   1. Click "Create a new domain"
   2. Set a domain name
   3. Use the default options
-  4. Set an Access Policy from a specific IP address (your personal IP).
+  4. Set an Access Policy.  I suggest applying both IAM access to
+     write to elasticsearch from your AWS account and IP-specific
+     access so you can view logging outputs in Kibana.  Here's a
+     sample policy:
 
-2. Clone this repo & update the elasticsearch hostname. Note the
-   format is `hostname:port`.  For example, with AWS Elasticsearch Service, use
-   `search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com:80`.  This is required as [Logstash does not allow Environment Variables in a conf file](https://github.com/elastic/logstash/issues/1910#issuecomment-59634201)).
+     ```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+	{
+	    "Effect": "Allow",
+	    "Principal": {
+		"AWS": "arn:aws:iam::xxxxxxxxxxxx:root"
+	    },
+	    "Action": "es:*",
+	    "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*"
+	},
+	{
+	    "Sid": "",
+	    "Effect": "Allow",
+	    "Principal": {
+		"AWS": "*"
+	    },
+	    "Action": "es:*",
+	    "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*",
+	    "Condition": {
+		"IpAddress": {
+		    "aws:SourceIp": [
+			"192.168.1.0",
+			"192.168.1.1"
+		    ]
+		}
+	    }
+	}
+    ]
+}
+```
 
-        perl -pi -e "s|(?<=hosts => \[\")(.*)(?=\"\])|foobar:80|g" /conf/gelf_to_elasticsearch.conf
+2. Start docker logging container.
 
-3. On the Docker host, start a Logstash container:
+        docker run -it -e ELASTICSEARCH_HOST=search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com \
+                   -p 12201:12201/udp tdgp/material_selector_logstash /start_logstash.sh
 
-        docker run --rm -v $PWD/conf:/logstash-conf -p 12201:12201/udp logstash logstash -f /logstash-conf/gelf_to_elasticsearch.conf
+   If you do not have access to the `tdgp/material_selector_logstash`
+   Docker repo, build it yourself first:
 
-4. Now you can start the containers which you want logged.  Here's a simple example:
+         docker build -t tdgp/material_selector_logstash .
 
-        docker run --log-driver=gelf --log-opt gelf-address=udp://localhost:12201 busybox /bin/sh -c 'while true; do echo "Hello $(date)"; sleep 1; done'
+3. Start a Docker container which you want logged using the Docker
+   logging flags.  Here's a simple example:
+
+         docker run --log-driver=gelf --log-opt gelf-address=udp://localhost:12201 \
+                    busybox /bin/sh -c 'while true; do echo "Hello $(date)"; sleep 1; done'
 
 # Deploying to an ECS Cluster
 
@@ -47,7 +85,13 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
 {
     "Version": "2012-10-17",
     "Statement": [
-        {
+	  {
+	      "Effect": "Allow",
+	      "Principal": { "AWS": [ "XXXXXXXXXXXX" ] },
+	      "Action": [ "es:*" ],
+	      "Resource": "arn:aws:es:us-west-2:XXXXXXXXXXXX:domain/pschmitt-es-test/*"
+	  },
+      {
 	    "Sid": "",
 	    "Effect": "Allow",
 	    "Principal": { "AWS": "*" },
@@ -58,26 +102,12 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
 		      "aws:SourceIp": [ "192.168.1.1", "192.168.1.2" ]
 		  }
 	    }
-	  },
-	  {
-	      "Effect": "Allow",
-	      "Principal": { "AWS": [ "XXXXXXXXXXXX" ] },
-	      "Action": [ "es:*" ],
-	      "Resource": "arn:aws:es:us-west-2:XXXXXXXXXXXX:domain/pschmitt-es-test/*"
 	  }
     ]
 }
 ```
 
-2. Create a bucket for conf files (make sure the name is unique!)
-
-        aws s3api create-bucket --bucket flame-config
-
-3. Upload Logstash config to the `flame-config` bucket.
-
-        aws s3 cp conf/gelf_to_elasticsearch.conf s3://pschmitt-ecs-config/
-
-4. Configure ECS cluster.  Here's how you do it with CloudFormation:
+2. Configure ECS cluster.  Here's how you do it with CloudFormation:
 
   1. The
      [AWS ECS-optimized AMI](https://aws.amazon.com/marketplace/pp/B00U6QTYI2)
