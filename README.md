@@ -1,12 +1,23 @@
 # docker-logging
 
-Pipe `docker logs` output into Elasticsearch for later visualization with Kibana using Logstash (aka the ELK Stack).
+Easily pipe `docker logs` output from an
+[AWS ECS](https://aws.amazon.com/ecs/) into
+[AWS Elasticsearch service](https://aws.amazon.com/elasticsearch-service/)
+for later visualization with Kibana using Logstash (aka the ELK
+Stack).
+
+This repository may become deprecated when the support for the
+[AWS CloudWatch Logs logging driver](https://docs.docker.com/engine/reference/logging/awslogs/)
+is
+[added to the ECS agent](https://github.com/aws/amazon-ecs-agent/issues/9). [@samuelkarp wrote the logging driver](https://github.com/docker/docker/pull/15495)
+and happens to work for AWS on ECS, so this seems inevitable.
 
 ![Schematic of how Docker Logs get scraped into Elasticsearch using docker-logging logstash container.  Source: Docker-Logging.png; Find original visio file at Docker-Logging.vsdx](Docker-Logging.png)
 
 # Local Setup
 
-Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version >= 1.5
+Prerequisites: Docker >= 1.8.  If you use Docker-compose, make sure
+its version >= 1.5
 
 1. Spin up an Elasticsearch server. The easiest way to do this is via
    the
@@ -22,34 +33,34 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
 
      ```
 {
-    "Version": "2012-10-17",
-    "Statement": [
-	{
-	    "Effect": "Allow",
-	    "Principal": {
-		"AWS": "arn:aws:iam::xxxxxxxxxxxx:root"
-	    },
-	    "Action": "es:*",
-	    "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*"
-	},
-	{
-	    "Sid": "",
-	    "Effect": "Allow",
-	    "Principal": {
-		"AWS": "*"
-	    },
-	    "Action": "es:*",
-	    "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*",
-	    "Condition": {
-		"IpAddress": {
-		    "aws:SourceIp": [
-			"192.168.1.0",
-			"192.168.1.1"
-		    ]
-		}
-	    }
-	}
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::xxxxxxxxxxxx:root"
+      },
+      "Action": "es:*",
+      "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*"
+    },
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "*"
+      },
+      "Action": "es:*",
+      "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*",
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": [
+            "192.168.1.0",
+            "192.168.1.1"
+          ]
+        }
+      }
+    }
+  ]
 }
 ```
 
@@ -74,38 +85,6 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
 1. Create an Elasticsearch Cluster with
    [AWS Elasticsearch Service](https://aws.amazon.com/elasticsearch-service/)
    (see setup, above) and make a note of the Elasticsearch URL.
-   You'll want to set the Access Policy so both the cluster and your
-   IP address can access Elasticsearch & Kibana.
-
-   Here's an example access policy for the "pschmitt-es-test"
-   Elasticsearch Cluster where we grant access to AWS account XXXXXXXXXXXX and
-   the IP addresses 192.168.1.1, 192.168.1.2:
-
-   ```
-{
-    "Version": "2012-10-17",
-    "Statement": [
-	  {
-	      "Effect": "Allow",
-	      "Principal": { "AWS": [ "XXXXXXXXXXXX" ] },
-	      "Action": [ "es:*" ],
-	      "Resource": "arn:aws:es:us-west-2:XXXXXXXXXXXX:domain/pschmitt-es-test/*"
-	  },
-      {
-	    "Sid": "",
-	    "Effect": "Allow",
-	    "Principal": { "AWS": "*" },
-	    "Action": "es:*",
-	    "Resource": "arn:aws:es:us-west-2:XXXXXXXXXXXX:domain/pschmitt-es-test/*",
-	    "Condition": {
-		  "IpAddress": {
-		      "aws:SourceIp": [ "192.168.1.1", "192.168.1.2" ]
-		  }
-	    }
-	  }
-    ]
-}
-```
 
 2. Configure ECS cluster.  Here's how you do it with CloudFormation:
 
@@ -143,13 +122,20 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
              [
                  "#!/bin/bash -xe\n",
                  "mkdir -p /etc/logstash/conf.d\n",
-                 "aws s3 cp s3://pschmitt-ecs-config/gelf_to_elasticsearch.conf /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
-                 "perl -pi -e 's|(?<=hosts => \\[\")(.*)(?=\"\\])|",
-                 {
-                   "Ref": "ElasticsearchAddress"
-                 },
-                 "|g' /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n",
-                 "docker run -d --restart=always -v /etc/logstash/conf.d:/etc/logstash/conf.d -p 12201:12201/udp logstash logstash -f /etc/logstash/conf.d/gelf_to_elasticsearch.conf\n"
+                 "docker run -d --restart=always  -p 12201:12201/udp",
+				 " -e ELASTICSEARCH_HOST=",
+				 {
+				   "Ref": "ElasticsearchAddress"
+				 },
+				 " -e AWS_REGION=",
+				 {
+				   "Ref": "AWS::Region"
+				 },
+				 " -e ENVIRONMENT=",
+				 {
+				   "Ref": "Environment"
+				 },
+				 "tdgp/material_selector_logstash /start_logstash.sh\n"
              ]
            ]
          }
@@ -165,9 +151,8 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
    }
    ```
 
-5. Submit an ECS task definition which uses the gelf logging
-   driver. The ContainerDefinition should include a section like
-   this:
+3. Submit an ECS task definition which uses the gelf logging
+   driver. The ContainerDefinition should include a section like this:
 
         "logConfiguration": {
            "logDriver": "gelf",
@@ -177,7 +162,8 @@ Prerequisites:  Docker >= 1.8.  If you use Docker-compose, make sure its version
             }
         }
 
-   Note the log option `tag` requires Docker > 1.9.  For Docker 1.8, use `gelf-tag`.  Otherwise, ECS may report
+   Note the log option `tag` requires Docker > 1.9.  For Docker 1.8,
+   use `gelf-tag`.  Otherwise, ECS may report
 
    > Failed to initialize logging driver: unknown log opt 'tag' for gelf log driver".
 
