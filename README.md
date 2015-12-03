@@ -139,7 +139,7 @@ its version >= 1.5
 				 {
 				   "Ref": "Environment"
 				 },
-				 "pedros007/docker-logging /start_logstash.sh\n"
+				 " pedros007/docker-logging /start_logstash.sh\n"
              ]
            ]
          }
