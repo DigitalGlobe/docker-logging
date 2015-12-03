@@ -126,7 +126,6 @@ its version >= 1.5
              "",
              [
                  "#!/bin/bash -xe\n",
-                 "mkdir -p /etc/logstash/conf.d\n",
                  "docker run -d --restart=always  -p 12201:12201/udp",
 				 " -e ELASTICSEARCH_HOST=",
 				 {
@@ -192,6 +191,8 @@ its version >= 1.5
 * There are many ways to pipe `docker logs` into Elasticsearch.
   [This docker-logstash repo](https://github.com/edefaria/docker-logstash)
   demonstrates a couple of options (gelf, lumberjack, syslog & tcp).
+* Find user-configurable variables on lines starting with `ENV` in
+  Dockerfile.
 
 # Links
 
