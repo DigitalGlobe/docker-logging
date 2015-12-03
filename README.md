@@ -72,12 +72,12 @@ its version >= 1.5
 
         docker run -it -p 12201:12201/udp -v ~/.aws/:/root/.aws\
                     -e ELASTICSEARCH_HOST=search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com \
-                   tdgp/material_selector_logstash /start_logstash.sh
+                   pedros007/docker-logging /start_logstash.sh
 
-   If you do not have access to the `tdgp/material_selector_logstash`
+   If you do not have access to the `pedros007/docker-logging`
    Docker repo, build it yourself first:
 
-         docker build -t tdgp/material_selector_logstash .
+         docker build -t pedros007/docker-logging .
 
 4. Start a Docker container which you want logged using the Docker
    logging flags.  Here's a simple example:
@@ -139,7 +139,7 @@ its version >= 1.5
 				 {
 				   "Ref": "Environment"
 				 },
-				 "tdgp/material_selector_logstash /start_logstash.sh\n"
+				 "pedros007/docker-logging /start_logstash.sh\n"
              ]
            ]
          }
