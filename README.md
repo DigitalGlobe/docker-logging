@@ -64,17 +64,22 @@ its version >= 1.5
 }
 ```
 
-2. Start docker logging container.
+2. Ensure your AWS credentials are available in `$HOME/.aws`. You can
+   configure this via the [AWS cli](https://aws.amazon.com/cli/)
+   command `aws configure`.
 
-        docker run -it -e ELASTICSEARCH_HOST=search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com \
-                   -p 12201:12201/udp tdgp/material_selector_logstash /start_logstash.sh
+3. Start docker logging container.
+
+        docker run -it -p 12201:12201/udp -v ~/.aws/:/root/.aws\
+                    -e ELASTICSEARCH_HOST=search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com \
+                   tdgp/material_selector_logstash /start_logstash.sh
 
    If you do not have access to the `tdgp/material_selector_logstash`
    Docker repo, build it yourself first:
 
          docker build -t tdgp/material_selector_logstash .
 
-3. Start a Docker container which you want logged using the Docker
+4. Start a Docker container which you want logged using the Docker
    logging flags.  Here's a simple example:
 
          docker run --log-driver=gelf --log-opt gelf-address=udp://localhost:12201 \
