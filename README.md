@@ -135,10 +135,6 @@ its version >= 1.5
 				 {
 				   "Ref": "AWS::Region"
 				 },
-				 " -e ENVIRONMENT=",
-				 {
-				   "Ref": "Environment"
-				 },
 				 " pedros007/docker-logging /start_logstash.sh\n"
              ]
            ]

@@ -11,7 +11,6 @@ set -e
 # test with `grep -Po PATTERN`
 # http://unix.stackexchange.com/a/103008/94258
 perl -pi -e "s|(?<=hosts => \\[\")(.*)(?=\"\\])|${ELASTICSEARCH_HOST}|g" /etc/logstash/conf.d/gelf_to_elasticsearch.conf
-perl -pi -e "s|(?<=index => \")(.*)(?=-logs\-%{\+YYYY\.MM\.DD}\")|${ENVIRONMENT}|g" /etc/logstash/conf.d/gelf_to_elasticsearch.conf
 perl -pi -e "s|(?<=region => \")(.*)(?=\")|${AWS_REGION}|g" /etc/logstash/conf.d/gelf_to_elasticsearch.conf
 
 # Run as user logstash
