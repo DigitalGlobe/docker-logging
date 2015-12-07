@@ -151,6 +151,51 @@ its version >= 1.5
    }
    ```
 
+  3. Make sure your EC2 Instance or Autoscaling Group has an Instance
+     Profile and Role which grant write access to your Elasticsearch
+     service.  Here are example Cloud Formation resources which enable
+     this.  Make sure your `AWS::EC2::Instance` or
+     `AWS::AutoScaling::LaunchConfiguration` have `IamInstanceProfile`
+     set to the Instance Profile resource created by CloudFormation
+     (in the example below, the setting would be
+     `"IamInstanceProfile": { "Ref": "EC2InstanceProfile" },`):
+
+     ```
+	 "EC2Role": {
+       "Type": "AWS::IAM::Role",
+       "Metadata": {
+         "Comment": "Defines all permissions which an EC2 Instance attached to ECS Cluster should have"
+       },
+       "Properties": {
+         "AssumeRolePolicyDocument": {
+           "Statement": [
+             {
+               "Effect": "Allow",
+               "Principal": {
+                 "Service": [ "ec2.amazonaws.com" ]
+               },
+               "Action": [ "sts:AssumeRole" ]
+             }
+           ]
+         },
+         "Path": "/",
+         "ManagedPolicyArns": [
+           "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
+           "arn:aws:iam::aws:policy/AmazonESFullAccess",
+           "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
+           "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
+         ]
+       }
+     },
+     "EC2InstanceProfile": {
+       "Type": "AWS::IAM::InstanceProfile",
+       "Properties": {
+         "Path": "/",
+         "Roles": [ { "Ref": "EC2Role" } ]
+       }
+     }
+    ```
+
 3. Submit an ECS task definition which uses the gelf logging
    driver. The ContainerDefinition should include a section like this:
 
