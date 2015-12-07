@@ -29,7 +29,9 @@ its version >= 1.5
   4. Set an Access Policy.  I suggest applying both IAM access to
      write to elasticsearch from your AWS account and IP-specific
      access so you can view logging outputs in Kibana.  Here's a
-     sample policy:
+     sample policy (be sure to change the region and xxxxxxxxxxxx with
+     your
+     [12-digit AWS account ID](http://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html)):
 
      ```
 {
