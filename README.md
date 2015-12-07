@@ -147,7 +147,7 @@ its version >= 1.5
      ```
    "ElasticsearchAddress": {
      "Type": "String",
-     "Description": "Host and port of Elasticsearch server for logging. With the AWS Elasticsearch Service use Endpoint:80. Ensure the access policy permits access."
+     "Description": "Host of Elasticsearch server for logging. Do not add http:// or the port.  Ensure the access policy permits access."
    }
    ```
 
