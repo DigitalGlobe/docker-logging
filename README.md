@@ -48,7 +48,7 @@ its version >= 1.5
 
 2. Configure ECS cluster.  Here's how you do it with CloudFormation:
 
-  1. Your EC2 instances must use version >= 2015.09.d of the
+  1. Your EC2 instances must use version >= 2015.09.e of the
      ECS-optimized AMI.  This is required to enable docker logging
      driver support.
 
