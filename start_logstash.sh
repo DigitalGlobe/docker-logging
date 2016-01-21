@@ -10,10 +10,9 @@ set -e
 # (?=foo) positive lookahead
 # test with `grep -Po PATTERN`
 # http://unix.stackexchange.com/a/103008/94258
-perl -pi -e "s|(?<=hosts => \\[\")(.*)(?=\"\\])|${ELASTICSEARCH_HOST}|g" /etc/logstash/conf.d/gelf_to_elasticsearch.conf
-perl -pi -e "s|(?<=region => \")(.*)(?=\")|${AWS_REGION}|g" /etc/logstash/conf.d/gelf_to_elasticsearch.conf
+perl -pi -e "s|(?<=key => \")(.*)(?=\")|${LOGGLY_CUSTOMER_TOKEN}|g" /etc/logstash/conf.d/gelf_to_loggly.conf
 
 # Run as user logstash
 set -- gosu logstash
-logstash -f /etc/logstash/conf.d/gelf_to_elasticsearch.conf
+logstash -f /etc/logstash/conf.d/gelf_to_loggly.conf
 # Add `--verbose --debug` if you need more info.

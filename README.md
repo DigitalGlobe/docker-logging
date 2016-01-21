@@ -1,7 +1,9 @@
 # docker-logging
 
 Easily pipe `docker logs` output from an
-[AWS ECS](https://aws.amazon.com/ecs/) into
+[AWS ECS](https://aws.amazon.com/ecs/) instance into Loggly.
+
+See the aws-elasticsearch tag to pipe output to
 [AWS Elasticsearch service](https://aws.amazon.com/elasticsearch-service/)
 for later visualization with Kibana using Logstash (aka the ELK
 Stack).
@@ -19,62 +21,13 @@ and happens to work for AWS on ECS, so this seems inevitable.
 Prerequisites: Docker >= 1.8.  If you use Docker-compose, make sure
 its version >= 1.5
 
-1. Spin up an Elasticsearch server. The easiest way to do this is via
-   the
-   [AWS Elasticsearch Service](https://aws.amazon.com/elasticsearch-service/):
+1. Create an account with [Loggly](https://www.loggly.com/).
+2. Create a customer token (Source Setup -> Customer Tokens -> Add New)
+3. Start docker logging container & pass in the token you generated.
 
-  1. Click "Create a new domain"
-  2. Set a domain name
-  3. Use the default options
-  4. Set an Access Policy.  I suggest applying both IAM access to
-     write to elasticsearch from your AWS account and IP-specific
-     access so you can view logging outputs in Kibana.  Here's a
-     sample policy (be sure to change the region and xxxxxxxxxxxx with
-     your
-     [12-digit AWS account ID](http://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html)):
-
-     ```
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::xxxxxxxxxxxx:root"
-      },
-      "Action": "es:*",
-      "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*"
-    },
-    {
-      "Sid": "",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "*"
-      },
-      "Action": "es:*",
-      "Resource": "arn:aws:es:us-west-2:xxxxxxxxxxxx:domain/my-elasticsearch-domain/*",
-      "Condition": {
-        "IpAddress": {
-          "aws:SourceIp": [
-            "192.168.1.0",
-            "192.168.1.1"
-          ]
-        }
-      }
-    }
-  ]
-}
-```
-
-2. Ensure your AWS credentials are available in `$HOME/.aws`. You can
-   configure this via the [AWS cli](https://aws.amazon.com/cli/)
-   command `aws configure`.
-
-3. Start docker logging container.
-
-        docker run -it -p 12201:12201/udp -v ~/.aws/:/root/.aws\
-                    -e ELASTICSEARCH_HOST=search-pschmitt-es-test-3pm4igbk4q3nr5racsahpugud4.us-west-2.es.amazonaws.com \
-                   pedros007/docker-logging /start_logstash.sh
+        docker run -it -p 12201:12201/udp \
+		            -e LOGGLY_CUSTOMER_TOKEN=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
+					pedros007/docker-logging:develop /start_logstash.sh
 
    If you do not have access to the `pedros007/docker-logging`
    Docker repo, build it yourself first:
@@ -95,108 +48,42 @@ its version >= 1.5
 
 2. Configure ECS cluster.  Here's how you do it with CloudFormation:
 
-  1. The
-     [AWS ECS-optimized AMI](https://aws.amazon.com/marketplace/pp/B00U6QTYI2)
-     (2015.09.b) is running docker-1.7.1 as of this
-     writing. [A post in the AWS forums](https://forums.aws.amazon.com/thread.jspa?messageID=683482)
-     states "[AWS is] testing 1.9 RC and plan to deliver it this
-     month."  It's not ready yet, so we must manually upgrade Docker.
+  1. Your EC2 instances must use version >= 2015.09.d of the
+     ECS-optimized AMI.  This is required to enable docker logging
+     driver support.
 
-     We also fetch the Logstash configuration & pass in the
-     Elasticsearch URL and start the Logstash container.  Add this to
-     the `commands` section of your
+  2. Fetch the Logstash configuration & pass in the Elasticsearch URL
+     and start the Logstash container.  Add this to the `commands`
+     section of your
      [AWS::Cloudformation::Init](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.html).
 
      ```
-     "03_upgrade_docker_for_log_driver_support": {
-       "command": {
-         "Fn::Join": [
-             "",
-             [
-                 "#!/bin/bash -xe\n",
-                 "service docker stop\n",
-                 "cp /usr/bin/docker /usr/bin/docker.old\n",
-                 "curl -o /usr/bin/docker https://get.docker.com/builds/Linux/x86_64/docker-1.9.0\n",
-                 "service docker start\n"
-             ]
-           ]
-         }
-       },
-       "04_configure_docker_logstash": {
+       "03_configure_docker_logstash": {
          "command": {
            "Fn::Join": [
              "",
              [
                  "#!/bin/bash -xe\n",
                  "docker run -d --restart=always  -p 12201:12201/udp",
-				 " -e ELASTICSEARCH_HOST=",
+				 " -e LOGGLY_CUSTOMER_TOKEN=",
 				 {
-				   "Ref": "ElasticsearchAddress"
+				   "Ref": "LogglyCustomerToken"
 				 },
-				 " -e AWS_REGION=",
-				 {
-				   "Ref": "AWS::Region"
-				 },
-				 " pedros007/docker-logging /start_logstash.sh\n"
+				 " pedros007/docker-logging:develop /start_logstash.sh\n"
              ]
            ]
          }
        }
      ```
 
-  2. Add ElasticsearchAddress to your `Parameters` section:
+  3. Add LogglyCustomerToken to your `Parameters` section:
 
      ```
-   "ElasticsearchAddress": {
+   "LogglyCustomerToken": {
      "Type": "String",
-     "Description": "Host of Elasticsearch server for logging. Do not add http:// or the port.  Ensure the access policy permits access."
+     "Description": "Token which enables access to Loggly.  Can have many tokens per Loggly account.  For details, see https://www.loggly.com/docs/customer-token-authentication-token"
    }
    ```
-
-  3. Make sure your EC2 Instance or Autoscaling Group has an Instance
-     Profile and Role which grant write access to your Elasticsearch
-     service.  Here are example Cloud Formation resources which enable
-     this.  Make sure your `AWS::EC2::Instance` or
-     `AWS::AutoScaling::LaunchConfiguration` have `IamInstanceProfile`
-     set to the Instance Profile resource created by CloudFormation
-     (in the example below, the setting would be
-     `"IamInstanceProfile": { "Ref": "EC2InstanceProfile" },`):
-
-     ```
-	 "EC2Role": {
-       "Type": "AWS::IAM::Role",
-       "Metadata": {
-         "Comment": "Defines all permissions which an EC2 Instance attached to ECS Cluster should have"
-       },
-       "Properties": {
-         "AssumeRolePolicyDocument": {
-           "Statement": [
-             {
-               "Effect": "Allow",
-               "Principal": {
-                 "Service": [ "ec2.amazonaws.com" ]
-               },
-               "Action": [ "sts:AssumeRole" ]
-             }
-           ]
-         },
-         "Path": "/",
-         "ManagedPolicyArns": [
-           "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
-           "arn:aws:iam::aws:policy/AmazonESFullAccess",
-           "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess",
-           "arn:aws:iam::aws:policy/AmazonSQSFullAccess"
-         ]
-       }
-     },
-     "EC2InstanceProfile": {
-       "Type": "AWS::IAM::InstanceProfile",
-       "Properties": {
-         "Path": "/",
-         "Roles": [ { "Ref": "EC2Role" } ]
-       }
-     }
-    ```
 
 3. Submit an ECS task definition which uses the gelf logging
    driver. The ContainerDefinition should include a section like this:
@@ -204,15 +91,14 @@ its version >= 1.5
         "logConfiguration": {
            "logDriver": "gelf",
            "options": {
-             "gelf-address": "udp://localhost:12201",
-             "tag": "nginx"
+             "gelf-address": "udp://localhost:12201"
             }
         }
 
-   Note the log option `tag` requires Docker > 1.9.  For Docker 1.8,
-   use `gelf-tag`.  Otherwise, ECS may report
-
-   > Failed to initialize logging driver: unknown log opt 'tag' for gelf log driver".
+  You can append an optional tag to the `options` map.  This tag is
+  used to decide which Logstash grok/filters should be used.  See
+  `conf/gelf_to_loggly.conf` for details.  Currently supported tags
+  are `nginx`, `postgresql` & `rails`.
 
    As of this writing, the CloudFormation
    [AWS::ECS::TaskDefintiion](http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ecs-taskdefinition-containerdefinitions.html)
@@ -231,6 +117,8 @@ its version >= 1.5
   events.  TCP/syslog can provide a more robust solution.  See
   [this StackOverflow](http://stackoverflow.com/a/33816663/40785) for
   some more details.
+* See the `aws-elasticsearch` tag of this repository for a method to
+  store logs in AWS Elasticsearch Service.
 * There are many ways to pipe `docker logs` into Elasticsearch.
   [This docker-logstash repo](https://github.com/edefaria/docker-logstash)
   demonstrates a couple of options (gelf, lumberjack, syslog & tcp).
