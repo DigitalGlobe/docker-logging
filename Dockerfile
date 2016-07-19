@@ -1,7 +1,8 @@
-FROM logstash
+FROM logstash:2.3.4-1
 MAINTAINER Peter Schmitt <peter.schmitt@digitalglobe.com>
 
-RUN /opt/logstash/bin/plugin install logstash-output-amazon_es
+RUN /opt/logstash/bin/logstash-plugin install logstash-output-amazon_es
+RUN /opt/logstash/bin/logstash-plugin install logstash-patterns-core
 
 COPY conf /etc/logstash/conf.d
 COPY start_logstash.sh /
